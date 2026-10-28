@@ -39,7 +39,7 @@
 - 座標系: ロボット base_link は世界座標 (0, 0, 1.015)。テーブル面 = 世界 z 1.015 = ロボット基準 z 0。4cmブロックの中心はロボット基準 z=0.02
 - リンク寸法(URDF): 肩高さ 0.0714, 上腕 0.083, 前腕 0.0935, joint4→指先 約0.12（把持点 0.11）
 - 関節の向き(実測): joint2 正=前傾, joint3・joint4 正=後ろ向き。鉛直からの前傾角は θ2=q2, θ3=q2-q3, θ4=q2-q3-q4
-- `anthropic` SDK はイメージに無いので `pip3 install anthropic`（コンテナ再作成時に再実行）
+- `anthropic` SDK はイメージに無いので `pip3 install -U anthropic brotli`（コンテナ再作成時に再実行）。イメージ同梱の Brotli 1.0.9 のままだと SDK が `Connection error` になる
 - デモ物体は `scripts/setup_world.sh` で spawn（red/blue/yellow_block, blue/green_tray）
 - APIキーは `pai-final-task/.env` に書き、`docker/run.sh` が読む
 

@@ -36,7 +36,7 @@ OUTPUT_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "action": {"type": "string", "enum": ["move_to", "grasp", "release", "home"]},
-                    "target": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                    "target": {"type": "array", "items": {"type": "number"}},
                     "note": {"type": "string"},
                 },
                 "required": ["action", "note"],
@@ -135,8 +135,8 @@ class Planner(Node):
             raise ValueError("empty plan")
         for sg in data["subgoals"]:
             if sg["action"] == "move_to":
-                if "target" not in sg:
-                    raise ValueError("move_to without target")
+                if len(sg.get("target") or []) != 3:
+                    raise ValueError("move_to needs target [x,y,z]")
                 x, y, z = sg["target"]
                 r = (x * x + y * y) ** 0.5
                 if not (R_MIN <= r <= R_MAX) or not (Z_MIN <= z <= Z_MAX):

@@ -28,7 +28,7 @@ pai-final-task/
 3. ブラウザで http://localhost:6080 を開く
 4. コンテナ内ターミナル（`docker exec -it -u ubuntu pai bash`）で
    ```bash
-   pip3 install anthropic                       # 初回のみ
+   pip3 install -U anthropic brotli             # 初回のみ(古いbrotliだとSDKが接続エラーになる)
    cd ~/pai_work/pai-final-task/ros2_ws && colcon build --symlink-install
    ros2 launch crane_plus_gazebo no_moveit_crane_plus_with_table.launch.py   # 別ターミナル(Ignition Gazebo)
    cd ~/pai_work/pai-final-task
