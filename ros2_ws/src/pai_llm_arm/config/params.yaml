@@ -1,0 +1,21 @@
+planner:
+  ros__parameters:
+    model: "claude-opus-5"
+    max_retries: 3
+    max_replans: 2
+controller:
+  ros__parameters:
+    joint_cmd_topic: "/crane_plus_arm_controller/joint_trajectory"
+    gripper_cmd_topic: "/crane_plus_gripper_controller/joint_trajectory"
+    move_duration_sec: 2.0
+    gripper_open: -0.5
+    gripper_close: 0.35
+monitor:
+  ros__parameters:
+    reach_tolerance_m: 0.03
+    stall_timeout_sec: 8.0
+perception:
+  ros__parameters:
+    world: "default"
+    robot_origin_xyz: [0.0, 0.0, 1.015]
+    period_sec: 0.5

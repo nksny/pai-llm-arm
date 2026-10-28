@@ -1,0 +1,57 @@
+# PAI最終課題: 自然言語指示によるCRANE+ V2のピック&プレース（LLMプランナー＋閉ループ再計画）
+
+Physical AI応用1講座 最終課題の作業ディレクトリ。
+
+## 構成
+
+```
+pai-final-task/
+├── docker/            コンテナ起動スクリプト（講義イメージ ros2-desktop-ai-robot-book-humble を使用）
+├── ros2_ws/src/pai_llm_arm/   自作ROS2パッケージ（提出対象）
+│   ├── pai_llm_arm/
+│   │   ├── planner_node.py     自然言語 → サブゴール列（LLM, Claude API）
+│   │   ├── controller_node.py  サブゴール → 関節/グリッパ指令（CRANE+ V2）
+│   │   ├── monitor_node.py     到達判定・失敗検知 → 再計画要求
+│   │   └── perception_node.py  物体座標の取得（Gazebo真値 / 余力でVLM）
+│   ├── launch/pai_demo.launch.py
+│   └── config/params.yaml
+├── scripts/           ワールド配置・ノード起動・指示送信の補助スクリプト（コンテナ内で実行）
+├── docs/              レポート草稿・構成図
+├── videos/            提出動画の素材・完成品（Gitには含めない）
+└── logs/              LLM入出力・実行ログ（提出時は個人情報が無いことを確認）
+```
+
+## 起動手順
+
+1. `pai-final-task/.env` に `ANTHROPIC_API_KEY=sk-ant-...` を書く（gitignore済）
+2. コンテナ起動: `bash docker/run.sh`（初回）/ `docker start pai`（2回目以降）
+3. ブラウザで http://localhost:6080 を開く
+4. コンテナ内ターミナル（`docker exec -it -u ubuntu pai bash`）で
+   ```bash
+   pip3 install anthropic                       # 初回のみ
+   cd ~/pai_work/pai-final-task/ros2_ws && colcon build --symlink-install
+   ros2 launch crane_plus_gazebo no_moveit_crane_plus_with_table.launch.py   # 別ターミナル(Ignition Gazebo)
+   cd ~/pai_work/pai-final-task
+   bash scripts/setup_world.sh      # 色付きブロックとトレイを配置
+   bash scripts/start_nodes.sh      # perception / controller / monitor / planner を起動
+   bash scripts/say.sh "赤いブロックを青いトレイに置いて"
+   ros2 topic echo /monitor/result  # 成否
+   bash scripts/reset_world.sh      # やり直し
+   ```
+
+## トピック構成
+
+```
+/task/instruction (String)  ─→ planner ─→ /plan/subgoals (JSON) ─→ controller ─→ /crane_plus_*_controller/joint_trajectory
+/perception/objects (JSON)  ─→ planner, monitor          /controller/status ─→ monitor ─→ /monitor/replan ─→ planner
+```
+
+- 座標はロボット base_link 基準 [m]（x前方, y左, z上, テーブル面 z=0）。perception は Ignition の `/world/default/pose/info` 真値から変換
+- 動画撮影は noVNC の画面を母機側で録画するか、Gazebo の `/gui/record_video` サービスを使う
+
+## 提出ルール（講義要項より）
+
+- レポートPDF: `説明資料_PAI最終課題_<omnicampusアカウント名>.pdf`
+- GitHub: public。講義イメージやCRANE+パッケージは含めず、本ディレクトリのみ
+- 動画: 1〜3分、タイトル `PAI最終課題_<omnicampusアカウント名>`、限定公開以上
+- 氏名・所属・メールアドレスを成果物に含めない。APIキーは環境変数のみ

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>pai_llm_arm</name>
+  <version>0.1.0</version>
+  <description>LLM planner + closed-loop controller for CRANE+ V2 (PAI final task)</description>
+  <maintainer email="noreply@example.com">pai</maintainer>
+  <license>MIT</license>
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <export><build_type>ament_python</build_type></export>
+</package>
