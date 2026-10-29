@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # コンテナ内で実行: 録画 videos/<name>.mp4 に、events ログを元に指示文と状態の字幕を焼き込む。
-#   bash scripts/annotate.sh <name> [speed]   -> videos/<name>_sub.mp4 (speed=2 なら2倍速にして「2倍速」表記)
+#   bash scripts/annotate.sh <name> [speed]   -> videos/<name>_sub.mp4 (speed=2 なら videos/<name>_sub2x.mp4 に2倍速・「2倍速」表記付き)
 set -e
 cd ~/pai_work/pai-final-task/videos
 NAME=$1; SPEED=${2:-1}
 FONT=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
-T0=$(cat "$NAME.start")
+T0=$(cat "$NAME.start"); OUT="${NAME}_sub.mp4"; [ "$SPEED" != 1 ] && OUT="${NAME}_sub${SPEED}x.mp4"
 python3 - "$NAME" "$T0" "$SPEED" "$FONT" > "/tmp/${NAME}_filter.txt" <<'PY'
 import sys, os
 name, t0, speed, font = sys.argv[1], float(sys.argv[2]), float(sys.argv[3]), sys.argv[4]
@@ -46,5 +46,5 @@ vf = ",".join(out)
 if speed != 1: vf = f"setpts=PTS/{speed}," + vf
 print(vf)
 PY
-ffmpeg -y -loglevel error -i "$NAME.mp4" -filter_complex_script "/tmp/${NAME}_filter.txt" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p "${NAME}_sub.mp4"
-echo "wrote videos/${NAME}_sub.mp4"
+ffmpeg -y -loglevel error -i "$NAME.mp4" -filter_complex_script "/tmp/${NAME}_filter.txt" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p "$OUT"
+echo "wrote videos/$OUT"
