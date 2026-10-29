@@ -69,5 +69,5 @@ Claude Code から操作する場合は `docker exec -u ubuntu -e DISPLAY=:0 pai
 
 1. `videos/*_sub.mp4` の4本を確認し、必要なら撮り直し（`run_demo.sh` 1本 1〜2分。字幕も自動生成）。
 2. 動画編集（1〜3分, 構成説明 → 基本 → 曖昧 → 妨害復帰 → 工夫点と今後。倍速は明記）。
-3. レポート `docs/report.md`（草稿済み）を推敲し、構成図を描いて PDF 化（ファイル名 `説明資料_PAI最終課題_<omnicampusアカウント名>.pdf`）。
+3. レポートを推敲（`docs/report.md` → コンテナ内で `python3 scripts/build_pdf.py` → `docs/report.pdf`）。提出時に `説明資料_PAI最終課題_<omnicampusアカウント名>.pdf` にリネーム。
 4. GitHub public リポジトリ作成 → push → README 最終確認。
