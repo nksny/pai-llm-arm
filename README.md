@@ -45,7 +45,9 @@ pai-final-task/
    bash scripts/run_demo.sh basic   "赤いブロックを青いトレイに置いて"          # videos/basic.mp4
    bash scripts/run_demo.sh recover "赤いブロックを緑のトレイに置いて" 20       # 20秒後に赤ブロックを動かし再計画を誘発
    bash scripts/cam.sh 0.48 -0.40 1.42 0.08 0.04 1.10                           # GUIカメラを位置→注視点で指定
+   bash scripts/annotate.sh recover 2       # 字幕(指示文・計画中・妨害・再計画・結果)を焼き込み、2倍速版を作る
    ```
+   `run_demo.sh` は録画と同時にイベント時刻を `videos/<name>.events` に記録し、終了時に字幕入り `videos/<name>_sub.mp4` も生成する。
 
 ## トピック構成
 

@@ -21,7 +21,7 @@ xtest.fake_input(d, 6, x=s.width_in_pixels - 2, y=s.height_in_pixels - 2); d.syn
 PY
     nohup ffmpeg -y -loglevel error -f x11grab -framerate 30 -video_size "$size" -i ":0.0+$ax,$ay" \
       -c:v libx264 -preset ultrafast -threads 2 -pix_fmt yuv420p "$OUT_DIR/${2:-demo}.mp4" > /tmp/ffmpeg.log 2>&1 &
-    echo $! > /tmp/ffmpeg.pid; echo "recording $size at +$ax,$ay -> $OUT_DIR/${2:-demo}.mp4" ;;
+    echo $! > /tmp/ffmpeg.pid; date +%s.%N > "$OUT_DIR/${2:-demo}.start"; echo "recording $size at +$ax,$ay -> $OUT_DIR/${2:-demo}.mp4" ;;
   stop)
     kill -INT "$(cat /tmp/ffmpeg.pid)" 2>/dev/null; sleep 2; echo "stopped"; ls -la "$OUT_DIR" ;;
   *) echo "usage: $0 start <name> | stop" ;;
