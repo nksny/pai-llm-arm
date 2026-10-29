@@ -14,7 +14,7 @@
     <text x="460" y="88" font-weight="bold">controller</text><text x="460" y="106" font-size="11">解析IK</text><text x="460" y="122" font-size="11">JointTrajectory 送信</text>
     <text x="665" y="88" font-weight="bold">CRANE+ V2</text><text x="665" y="106" font-size="11">Ignition Gazebo</text><text x="665" y="122" font-size="11">ros2_control</text>
     <text x="460" y="201" font-weight="bold">monitor</text><text x="460" y="218" font-size="11">置き位置の到達判定</text>
-    <text x="665" y="201" font-weight="bold">perception</text><text x="665" y="218" font-size="11">物体座標 (Gazebo 真値)</text>
+    <text x="665" y="201" font-weight="bold">perception</text><text x="665" y="218" font-size="11">俯瞰カメラ画像→色分割→逆投影</text>
   </g>
   <g stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#a)">
     <path d="M130 100 L190 100"/>
@@ -30,7 +30,7 @@
     <text x="340" y="92">/plan/subgoals</text>
     <text x="536" y="92">joint_trajectory</text>
     <text x="470" y="162">/controller/status</text>
-    <text x="672" y="162">pose/info</text>
+    <text x="672" y="162">camera image</text>
     <text x="560" y="196" text-anchor="middle" font-size="9.5">/perception/objects</text>
     <text x="268" y="175" fill="#b00">/monitor/replan (失敗理由)</text>
     <text x="268" y="222">再計画ループ（上限2回）</text>

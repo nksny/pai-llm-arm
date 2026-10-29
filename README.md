@@ -12,9 +12,11 @@ pai-final-task/
 │   │   ├── planner_node.py     自然言語 → サブゴール列（LLM, Claude API）
 │   │   ├── controller_node.py  サブゴール → 関節/グリッパ指令（CRANE+ V2）
 │   │   ├── monitor_node.py     到達判定・失敗検知 → 再計画要求
-│   │   └── perception_node.py  物体座標の取得（Gazebo真値 / 余力でVLM）
+│   │   ├── perception_node.py  物体座標の取得（Gazebo真値）
+│   │   └── perception_camera_node.py  俯瞰カメラ画像から色分割＋逆投影で物体座標を推定（真値を使わない）
 │   ├── launch/pai_demo.launch.py       4ノードの一括起動
-│   ├── launch/demo_gazebo.launch.py    Gazebo + CRANE+ V2 を録画向けGUI設定(1280x720, 固定カメラ)で起動
+│   ├── launch/demo_gazebo.launch.py    Gazebo + CRANE+ V2 を録画向けGUI設定(1280x720, 固定カメラ)で起動。既定で俯瞰カメラ付きワールド
+│   ├── worlds/table_camera.sdf         講義の table.sdf ＋ Sensors システム＋俯瞰カメラ
 │   └── config/params.yaml, gui.config
 ├── scripts/           ワールド配置・ノード起動・指示送信の補助スクリプト（コンテナ内で実行）
 ├── docs/              レポート草稿・構成図
@@ -36,6 +38,8 @@ pai-final-task/
    cd ~/pai_work/pai-final-task
    bash scripts/setup_world.sh      # 色付きブロックとトレイを配置
    bash scripts/start_nodes.sh      # perception / controller / monitor / planner を起動
+   PERCEPTION=camera bash scripts/start_nodes.sh   # 知覚を俯瞰カメラ画像(色分割)に切り替えて起動
+   python3 scripts/check_camera.py  # カメラ知覚と真値の誤差[mm]を表示
    bash scripts/say.sh "赤いブロックを青いトレイに置いて"
    ros2 topic echo /monitor/result  # 成否
    bash scripts/reset_world.sh      # やり直し
@@ -48,7 +52,9 @@ pai-final-task/
    bash scripts/annotate.sh recover 2       # 字幕(指示文・計画中・妨害・再計画・結果)を焼き込み、2倍速版を作る
    ```
    `run_demo.sh` は録画と同時にイベント時刻を `videos/<name>.events` に記録し、終了時に字幕入り `videos/<name>_sub.mp4` も生成する。
-6. 提出動画の組み立て: `python3 scripts/make_final.py`（4本のデモからタイトル・章カード付きの `videos/final.mp4` を生成。レポート PDF は `python3 scripts/build_pdf.py`。どちらもコンテナ内で `pip3 install markdown weasyprint` が必要）
+6. 繰り返し評価（録画なし）: `bash scripts/eval_batch.sh 5 camera` で4デモ×5回を回し `logs/eval.jsonl` に記録、
+   `python3 scripts/eval_summary.py camera` で成功率・所要時間・再計画回数・LLM統計の表を出す（タグは `truth` / `camera` など任意）
+7. 提出動画の組み立て: `python3 scripts/make_final.py`（4本のデモからタイトル・章カード付きの `videos/final.mp4` を生成。レポート PDF は `python3 scripts/build_pdf.py`。どちらもコンテナ内で `pip3 install markdown weasyprint` が必要）
 
 ## トピック構成
 
@@ -57,7 +63,10 @@ pai-final-task/
 /perception/objects (JSON)  ─→ planner, monitor          /controller/status ─→ monitor ─→ /monitor/replan ─→ planner
 ```
 
-- 座標はロボット base_link 基準 [m]（x前方, y左, z上, テーブル面 z=0）。perception は Ignition の `/world/default/pose/info` 真値から変換
+- 座標はロボット base_link 基準 [m]（x前方, y左, z上, テーブル面 z=0）。perception は Ignition の `/world/default/pose/info` 真値から変換、
+  perception_camera は `/overhead_camera/image`（テーブル上 0.7 m の真下向きカメラ, 640x480）から HSV 色分割 → 連結成分 → ピンホール逆投影で推定。
+  検出結果は `/perception/debug_image` で確認できる。両者は同じ `/perception/objects` を出すので planner/monitor は無変更
+- controller の動作時間は関節の最大移動量 / `joint_speed_rad_s`（下限 2.0 s）。大きな旋回をゆっくりにして把持中の滑落を防ぐ
 - `/monitor/result` には最終結果(success/failure)のみ流れる。再計画の経過は `/monitor/status` と各ノードのログ(`/tmp/*.log`)
 - 録画中は CPU 競合でシミュレーション速度が実時間の5〜7割に落ちるため、controller は `use_sim_time` でステップを刻む
 

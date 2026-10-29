@@ -30,8 +30,8 @@ spawn() {  # name sdf x y z
   ros2 run ros_gz_sim create -world $WORLD -name "$1" -string "$2" -x "$3" -y "$4" -z "$5" >/dev/null 2>&1 \
     && echo "spawned $1 at ($3, $4)"
 }
-# ブロック 4cm (ロボット基準 x前方, y左)
-spawn red_block    "$(box_sdf red_block    "0.04 0.04 0.04" "1 0 0"   0.02)" 0.12  0.06 $(echo "$TABLE_Z+0.03" | bc)
+# ブロック 4cm (ロボット基準 x前方, y左)。赤は緑トレイの角(x≥0.13,y≥0.06)に乗らない位置にする(乗ると傾いて把持が不安定になる)
+spawn red_block    "$(box_sdf red_block    "0.04 0.04 0.04" "1 0 0"   0.02)" 0.10  0.05 $(echo "$TABLE_Z+0.03" | bc)
 spawn blue_block   "$(box_sdf blue_block   "0.04 0.04 0.04" "0 0 1"   0.02)" 0.15 -0.03 $(echo "$TABLE_Z+0.03" | bc)
 spawn yellow_block "$(box_sdf yellow_block "0.04 0.04 0.04" "1 0.9 0" 0.02)" 0.09 -0.08 $(echo "$TABLE_Z+0.03" | bc)
 # トレイ: 薄い板 (グリッパが触れても動かないよう重め。関節トルクでは押せない)

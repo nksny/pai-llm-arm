@@ -32,6 +32,7 @@ class Monitor(Node):
         self.declare_parameter("reach_tolerance_m", 0.03)
         self.declare_parameter("settle_sec", 1.5)
         self.declare_parameter("max_replans", 2)
+        self.declare_parameter("container_keyword", "トレイ")  # 置き場(トレイ)自身は「置かれた物体」とみなさない
         self.replans = 0
         self.objects = {}
         self.plan = None
@@ -82,8 +83,10 @@ class Monitor(Node):
             self.result_pub.publish(String(data="success: no placement in plan"))
             return
         missing, used = [], set()  # 1つの物体が複数の置き位置を満たすことはない
+        kw = str(self.get_parameter("container_keyword").value)
+        movable = {n: p for n, p in self.objects.items() if not (kw and kw in n)}
         for gx, gy, _ in targets:
-            hit = [n for n, p in self.objects.items()
+            hit = [n for n, p in movable.items()
                    if n not in used and ((p[0] - gx) ** 2 + (p[1] - gy) ** 2) ** 0.5 <= tol and p[2] > 0.005]
             if hit:
                 used.add(hit[0])

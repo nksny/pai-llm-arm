@@ -3,7 +3,7 @@
 source /opt/ros/humble/setup.bash
 set_pose() { ign service -s /world/default/set_pose --reqtype ignition.msgs.Pose --reptype ignition.msgs.Boolean --timeout 2000 \
   --req "name: \"$1\", position: {x: $2, y: $3, z: $4}, orientation: {w: 1.0}" >/dev/null 2>&1; }
-set_pose red_block    0.12  0.06 1.04
+set_pose red_block    0.10  0.05 1.04
 set_pose blue_block   0.15 -0.03 1.04
 set_pose yellow_block 0.09 -0.08 1.04
 set_pose blue_tray    0.10  0.14 1.02

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # コンテナ内で実行: 録画 videos/<name>.mp4 に、events ログを元に指示文と状態の字幕を焼き込む。
 #   bash scripts/annotate.sh <name> [speed]   -> videos/<name>_sub.mp4 (speed=2 なら videos/<name>_sub2x.mp4 に2倍速・「2倍速」表記付き)
+# videos/<name>_cam.mp4 (cam_record.py が作るカメラ知覚のデバッグ画像) があれば右下に PiP で重ねる。
 set -e
 cd ~/pai_work/pai-final-task/videos
 NAME=$1; SPEED=${2:-1}
@@ -46,5 +47,13 @@ vf = ",".join(out)
 if speed != 1: vf = f"setpts=PTS/{speed}," + vf
 print(vf)
 PY
-ffmpeg -y -loglevel error -i "$NAME.mp4" -filter_complex_script "/tmp/${NAME}_filter.txt" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p "$OUT"
+if [ -f "${NAME}_cam.mp4" ]; then
+  OFF=$(python3 -c "print(float(open('${NAME}_cam.start').read()) - $T0)")
+  LBL=/tmp/${NAME}_txt/cam.txt; printf "知覚: 俯瞰カメラ画像の色分割(真値不使用)" > "$LBL"
+  { printf "[0:v]setpts=PTS/%s[m0];[1:v]scale=320:240,setpts=(PTS+%s/TB)/%s[pip];[m0][pip]overlay=x=W-w-16:y=H-h-100:eof_action=pass[m1];[m1]drawtext=fontfile=%s:textfile=%s:fontsize=20:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=6:x=w-tw-16:y=h-240-130[m2];[m2]" "$SPEED" "$OFF" "$SPEED" "$FONT" "$LBL"
+    sed 's/^setpts=PTS\/[0-9.]*,//' "/tmp/${NAME}_filter.txt"; } > "/tmp/${NAME}_filter2.txt"
+  ffmpeg -y -loglevel error -i "$NAME.mp4" -i "${NAME}_cam.mp4" -filter_complex_script "/tmp/${NAME}_filter2.txt" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p "$OUT"
+else
+  ffmpeg -y -loglevel error -i "$NAME.mp4" -filter_complex_script "/tmp/${NAME}_filter.txt" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p "$OUT"
+fi
 echo "wrote videos/$OUT"

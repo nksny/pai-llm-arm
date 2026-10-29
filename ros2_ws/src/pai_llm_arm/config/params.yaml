@@ -9,15 +9,31 @@ controller:
     joint_cmd_topic: "/crane_plus_arm_controller/joint_trajectory"
     gripper_cmd_topic: "/crane_plus_gripper_controller/joint_trajectory"
     move_duration_sec: 2.0
+    joint_speed_rad_s: 0.5   # 大きな旋回(例 1.1rad)は 2.2s かける。把持中の滑落対策
+    max_move_sec: 4.0
+    settle_sec: 0.5
+    held_tangential_offset_m: 0.012   # 片側固定指のため把持物体が固定指側へずれる分(実測)を置き位置で補正
+    held_radial_gain_m: 0.02          # 手先が傾く遠方では離した物体が外側へ転がる分(傾き30°で約1.5cm)を手前に寄せる
     gripper_open: -0.5
     gripper_close: 0.35
 monitor:
   ros__parameters:
-    reach_tolerance_m: 0.03
+    reach_tolerance_m: 0.035   # トレイ半幅 0.04 より少し内側(ブロック中心がここまでなら大半がトレイ上)
     stall_timeout_sec: 8.0
     max_replans: 2
+    container_keyword: "トレイ"   # トレイ自身は置き位置の判定対象にしない
 perception:
   ros__parameters:
     world: "default"
     robot_origin_xyz: [0.0, 0.0, 1.015]
+    period_sec: 0.5
+perception_camera:
+  ros__parameters:
+    image_topic: "/overhead_camera/image"
+    camera_xyz: [0.13, 0.0, 1.715]   # worlds/table_camera.sdf と一致させる
+    horizontal_fov: 0.9
+    robot_origin_xyz: [0.0, 0.0, 1.015]
+    table_z: 1.015
+    min_area_px: 300
+    stale_sec: 5.0
     period_sec: 0.5

@@ -66,7 +66,16 @@ class Controller(Node):
         super().__init__("controller")
         self.declare_parameter("joint_cmd_topic", "/crane_plus_arm_controller/joint_trajectory")
         self.declare_parameter("gripper_cmd_topic", "/crane_plus_gripper_controller/joint_trajectory")
-        self.declare_parameter("move_duration_sec", 2.0)
+        self.declare_parameter("move_duration_sec", 2.0)   # グリッパ開閉と、関節速度で決めた時間の下限
+        self.declare_parameter("joint_speed_rad_s", 0.5)   # 腕の最大関節速度。大きな旋回ほど時間をかけ、把持中の滑落を防ぐ
+        self.declare_parameter("max_move_sec", 4.0)
+        self.declare_parameter("settle_sec", 0.5)          # 動作完了後に次の指令までおく余裕
+        # CRANE+ のグリッパは片側の指だけが動く。閉じると物体は固定指側(+y, 反時計回り側)へ押し付けられ、
+        # 物体中心が把持点から接線方向に約 1.2cm ずれる(実測)。把持中は置き位置をその分だけ戻して補正する
+        self.declare_parameter("held_tangential_offset_m", 0.012)
+        # 遠い置き位置では手先が傾く(最大 30°)。傾いて保持したブロックは離すと外側へ転がるので、
+        # 傾き角の正弦に比例して置き位置を手前に寄せる(実測: 30° で約 1.5cm)
+        self.declare_parameter("held_radial_gain_m", 0.03)
         self.declare_parameter("gripper_open", -0.5)
         self.declare_parameter("gripper_close", 0.35)
         self.declare_parameter("home_joints", [0.0, 0.0, 0.0, 0.0])
@@ -75,7 +84,12 @@ class Controller(Node):
         self.status_pub = self.create_publisher(String, "/controller/status", 10)
         self.create_subscription(String, "/plan/subgoals", self.on_plan, 10)
         self.queue = []
-        self.timer = self.create_timer(self.get_parameter("move_duration_sec").value + 0.5, self.step)
+        self.last_q = list(self.get_parameter("home_joints").value)
+        self.holding = False
+        self.done_pending = False   # 最後のサブゴールの動作完了を待ってから done を出す(カメラ知覚では腕が物体を隠すため)
+        self.last_sg = None
+        self.busy_until = None   # 現在の動作が終わる時刻(ノードのクロック。use_sim_time ならシミュレーション時刻)
+        self.timer = self.create_timer(0.25, self.step)
         self.get_logger().info("controller ready")
 
     def on_plan(self, msg: String):
@@ -85,37 +99,74 @@ class Controller(Node):
             self.status_pub.publish(String(data=json.dumps({"state": "rejected", "reason": data["error"]}, ensure_ascii=False)))
             return
         self.queue = list(data["subgoals"])
+        self.done_pending = False
         self.get_logger().info(f"queued {len(self.queue)} subgoals")
 
+    def _now(self):
+        return self.get_clock().now().nanoseconds * 1e-9
+
+    def _arm_duration(self, q):
+        """関節の最大移動量から所要時間を決める(下限 move_duration_sec, 上限 max_move_sec)。"""
+        dq = max(abs(a - b) for a, b in zip(q, self.last_q))
+        lo = float(self.get_parameter("move_duration_sec").value)
+        hi = float(self.get_parameter("max_move_sec").value)
+        return min(hi, max(lo, dq / float(self.get_parameter("joint_speed_rad_s").value)))
+
     def step(self):
+        if self.busy_until is not None and self._now() < self.busy_until:
+            return
+        if self.done_pending:
+            self.done_pending = False
+            self.status_pub.publish(String(data=json.dumps({"state": "done", "last": self.last_sg}, ensure_ascii=False)))
         if not self.queue:
             return
         sg = self.queue.pop(0)
         act = sg["action"]
+        sec = float(self.get_parameter("move_duration_sec").value)
         if act == "move_to":
             q = ik(*sg["target"])
+            if q is not None and self.holding:
+                x, y, z = sg["target"]
+                r = math.hypot(x, y)
+                tilt = abs(math.pi - (q[1] - q[2] - q[3]))   # 手先の鉛直からの傾き
+                dr = float(self.get_parameter("held_radial_gain_m").value) * math.sin(tilt)
+                q2 = ik(x * (r - dr) / r, y * (r - dr) / r, z) if dr > 0 and r > dr else None
+                if q2 is not None:
+                    q = q2
+                q[0] -= float(self.get_parameter("held_tangential_offset_m").value) / max(r, 0.05)
             if q is None:
                 self.get_logger().error(f"IK failed for {sg['target']}")
                 self.status_pub.publish(String(data=json.dumps({"state": "failed", "reason": f"IK不可: {sg['target']}"}, ensure_ascii=False)))
                 self.queue.clear()
                 return
-            self.get_logger().info(f"move_to {sg['target']} -> q={[round(v, 2) for v in q]} (fk={[round(v, 3) for v in fk(q)]})")
-            self._send(self.arm_pub, ARM_JOINTS, q)
+            sec = self._arm_duration(q)
+            self.get_logger().info(f"move_to {sg['target']} -> q={[round(v, 2) for v in q]} (fk={[round(v, 3) for v in fk(q)]}, {sec:.1f}s)")
+            self._send(self.arm_pub, ARM_JOINTS, q, sec)
+            self.last_q = q
         elif act == "home":
-            self._send(self.arm_pub, ARM_JOINTS, list(self.get_parameter("home_joints").value))
+            q = list(self.get_parameter("home_joints").value)
+            sec = self._arm_duration(q)
+            self._send(self.arm_pub, ARM_JOINTS, q, sec)
+            self.last_q = q
         elif act == "grasp":
-            self._send(self.grip_pub, GRIPPER_JOINT, [self.get_parameter("gripper_close").value])
+            self._send(self.grip_pub, GRIPPER_JOINT, [self.get_parameter("gripper_close").value], sec)
+            self.holding = True
         elif act == "release":
-            self._send(self.grip_pub, GRIPPER_JOINT, [self.get_parameter("gripper_open").value])
-        state = "running" if self.queue else "done"
-        self.status_pub.publish(String(data=json.dumps({"state": state, "last": sg}, ensure_ascii=False)))
+            self._send(self.grip_pub, GRIPPER_JOINT, [self.get_parameter("gripper_open").value], sec)
+            self.holding = False
+        self.done_pending = False   # 最後のサブゴールの動作完了を待ってから done を出す(カメラ知覚では腕が物体を隠すため)
+        self.busy_until = self._now() + sec + float(self.get_parameter("settle_sec").value)
+        self.last_sg = sg
+        if self.queue:
+            self.status_pub.publish(String(data=json.dumps({"state": "running", "last": sg}, ensure_ascii=False)))
+        else:
+            self.done_pending = True   # 動作完了後に done を publish
 
-    def _send(self, pub, names, positions):
+    def _send(self, pub, names, positions, sec):
         msg = JointTrajectory()
         msg.joint_names = names
         pt = JointTrajectoryPoint()
         pt.positions = [float(p) for p in positions]
-        sec = float(self.get_parameter("move_duration_sec").value)
         pt.time_from_start = Duration(sec=int(sec), nanosec=int((sec % 1) * 1e9))
         msg.points = [pt]
         pub.publish(msg)

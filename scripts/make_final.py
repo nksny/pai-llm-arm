@@ -8,12 +8,11 @@ from weasyprint import HTML
 
 ROOT = os.path.expanduser("~/pai_work/pai-final-task")
 V = os.path.join(ROOT, "videos"); W = os.path.join(V, "_final"); os.makedirs(W, exist_ok=True)
-SPEED = 2
-DEMOS = [  # (name, 見出し, 説明)
-    ("basic", "① 基本のピック&プレース", "物体名で指示 → LLM が手順を生成 → IK で実行 → monitor が配置を確認"),
-    ("ambiguous", "② 曖昧な指示の解釈", "「同じ色のトレイ」を物体一覧から LLM が解釈する"),
-    ("sort", "③ 複数物体の仕分け", "色ごとに対応するトレイへ。対応するトレイが無い黄色は残すと判断"),
-    ("recover", "④ 妨害からの回復（閉ループ再計画）", "把持直後にブロックを動かす → 置き位置に物体なし → 失敗理由付きで再計画"),
+DEMOS = [  # (name, 見出し, 説明, 再生速度)  ※3分以内に収めるため長いデモは 2.5 倍速(画面に表記)
+    ("basic", "① 基本のピック&プレース", "物体名で指示 → LLM が手順を生成 → IK で実行 → monitor が配置を確認", 2),
+    ("ambiguous", "② 曖昧な指示の解釈", "「同じ色のトレイ」を物体一覧から LLM が解釈する", 2),
+    ("sort", "③ 複数物体の仕分け", "色ごとに対応するトレイへ。対応するトレイが無い黄色は残すと判断", 2.5),
+    ("recover", "④ 妨害からの回復（閉ループ再計画）", "把持直後にブロックを動かす → 置き位置に物体なし → 失敗理由付きで再計画", 2.5),
 ]
 
 def run(*cmd): subprocess.run(cmd, check=True)
@@ -46,10 +45,10 @@ def card(name, html, seconds):
         "-vf", "scale=1280:720,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", out)
     return out
 
-def demo_clip(name):
-    """2倍速字幕版を作り、計画待ち区間(直前のイベントから3秒残す)をカットする。"""
-    subprocess.run(["bash", os.path.join(ROOT, "scripts/annotate.sh"), name, str(SPEED)], check=True, stdout=subprocess.DEVNULL)
-    src = os.path.join(V, f"{name}_sub{SPEED}x.mp4")
+def demo_clip(name, SPEED):
+    """倍速字幕版を作り、計画待ち区間(直前のイベントから2.5秒残す)をカットする。"""
+    subprocess.run(["bash", os.path.join(ROOT, "scripts/annotate.sh"), name, f"{SPEED:g}"], check=True, stdout=subprocess.DEVNULL)
+    src = os.path.join(V, f"{name}_sub{SPEED:g}x.mp4")
     t0 = float(open(os.path.join(V, f"{name}.start")).read())
     ev = [l.rstrip("\n").split("\t") for l in open(os.path.join(V, f"{name}.events"), encoding="utf-8")]
     ev = [(float(t) - t0, k) for t, k, *_ in ev]
@@ -60,10 +59,10 @@ def demo_clip(name):
     for t, k in ev:
         if k in ("instruction", "replan"): prev = t
         elif k == "plan" and prev is not None:
-            a, b = prev + 3.0, t - 1.0
+            a, b = prev + 2.5, t - 1.0
             if b > a: cuts.append((a, b))
             prev = None
-    keep, cur, end = [], max(0.0, t_instr - 1.0), min(total * SPEED, t_result + 3.0)
+    keep, cur, end = [], max(0.0, t_instr - 1.0), min(total * SPEED, t_result + 2.0)
     for a, b in cuts:
         keep.append((cur, a)); cur = b
     keep.append((cur, end))
@@ -81,22 +80,23 @@ pieces.append(card("title", """
 <h2>LLM プランナー ＋ 閉ループ再計画（CRANE+ V2, ROS 2 Humble, Ignition Gazebo）</h2>
 <img src="img/architecture.svg">
 <div class="small">LLM (Claude) は指示をサブゴール列に翻訳するだけ。運動は解析 IK、失敗の検知と再計画要求は monitor が担当。
-動画の実行区間は 2 倍速（画面右上に表示）。</div>""", 9))
-for name, title, desc in DEMOS:
-    pieces.append(card(f"sec_{name}", f"<div class='num'>{title}</div><div class='desc'>{desc}</div>", 3))
-    pieces.append(demo_clip(name))
+物体位置は俯瞰カメラ画像の色分割から推定（シミュレータの真値は不使用、右下の小窓）。動画の実行区間は 2〜2.5 倍速（画面右上に表示）。</div>""", 8))
+for name, title, desc, speed in DEMOS:
+    pieces.append(card(f"sec_{name}", f"<div class='num'>{title}</div><div class='desc'>{desc}</div>", 2.5))
+    pieces.append(demo_clip(name, speed))
 pieces.append(card("closing", """
 <h1>工夫した点と今後の発展</h1>
 <table class="cols"><tr><td><h3>工夫した点</h3><ul>
 <li>LLM を制御ループの外に置くイベント駆動設計（遅延の影響なし）</li>
 <li>JSON Schema の固定語彙＋到達範囲チェックの二重の安全層</li>
 <li>monitor の失敗理由をそのまま LLM に渡す自然言語の再計画ループ</li>
-<li>解釈の根拠を note に残し、字幕・ログで判断過程を追える</li></ul></td>
+<li>カメラ画像の色分割＋逆投影による知覚（真値不使用, 誤差 2 mm）</li>
+<li>4 デモ×5 回の無人評価で失敗要因を特定し成功率を改善</li></ul></td>
 <td><h3>今後の発展</h3><ul>
-<li>VLM による知覚（Gazebo 真値からカメラ画像へ）</li>
+<li>VLM による知覚で未知物体の指示へ一般化</li>
 <li>世界モデル＋MPC による controller の置き換え</li>
 <li>toio（押し運び）への同一アーキテクチャの移植</li>
-<li>実行中の物体追跡で完了を待たずに再計画</li></ul></td></tr></table>""", 10))
+<li>実行中の物体追跡で完了を待たずに再計画</li></ul></td></tr></table>""", 9))
 
 lst = os.path.join(W, "list.txt")
 open(lst, "w").write("".join(f"file '{p}'\n" for p in pieces))

@@ -10,6 +10,8 @@ NAME=$1; INSTR=$2; DISTURB_AT=${3:-}
 bash scripts/reset_world.sh; sleep 3
 rm -f "videos/$NAME.events"; python3 scripts/event_log.py "videos/$NAME.events" & EVLOG=$!
 bash scripts/record.sh start "$NAME"; sleep 2
+CAMREC=; if ros2 topic list | grep -q /perception/debug_image; then   # カメラ知覚ならデバッグ画像も PiP 用に録画
+  rm -f "videos/${NAME}_cam.mp4"; python3 scripts/cam_record.py "videos/${NAME}_cam" & CAMREC=$!; fi
 timeout -s KILL 300 ros2 topic echo --once /monitor/result > /tmp/result_$NAME.txt 2>/dev/null &
 WAIT=$!
 sleep 1; printf "%s\tinstruction\t%s\n" "$(date +%s.%N)" "$INSTR" >> "videos/$NAME.events"; bash scripts/say.sh "$INSTR"; T0=$(date +%s)
@@ -18,6 +20,7 @@ if [ -n "$DISTURB_AT" ]; then
 fi
 wait $WAIT; T1=$(date +%s)
 sleep 3; bash scripts/record.sh stop >/dev/null; kill $EVLOG 2>/dev/null
+[ -n "$CAMREC" ] && { kill -INT $CAMREC; wait $CAMREC 2>/dev/null; }
 bash scripts/annotate.sh "$NAME" >/dev/null && echo "annotated: videos/${NAME}_sub.mp4"
 echo "== $NAME: $((T1-T0))s  $(grep data /tmp/result_$NAME.txt)"
 grep "plan (" /tmp/planner.log | tail -3 | cut -c1-100
