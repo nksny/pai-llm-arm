@@ -9,7 +9,7 @@
 - [x] 動画素材の録画（基本・曖昧・妨害復帰・仕分けの4本, `videos/`）
 - [ ] 動画編集（1〜3分に）
 - [ ] レポートPDF
-- [ ] GitHub public へ push、個人情報チェック
+- [x] GitHub public へ push（https://github.com/nksny/pai-llm-arm）、個人情報チェック済み
 
 ## 残り日程
 - 10/29: 済（仕分け確認、GUI設定・録画スクリプト整備、4本録画）
