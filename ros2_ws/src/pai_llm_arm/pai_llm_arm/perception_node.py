@@ -19,6 +19,7 @@ DEFAULT_TRACKED = {
     "yellow_block": "黄色いブロック",
     "blue_tray": "青いトレイ",
     "green_tray": "緑のトレイ",
+    "red_tray": "赤いトレイ",
 }
 
 _POSE_RE = re.compile(

@@ -13,8 +13,9 @@ pai-final-task/
 │   │   ├── controller_node.py  サブゴール → 関節/グリッパ指令（CRANE+ V2）
 │   │   ├── monitor_node.py     到達判定・失敗検知 → 再計画要求
 │   │   └── perception_node.py  物体座標の取得（Gazebo真値 / 余力でVLM）
-│   ├── launch/pai_demo.launch.py
-│   └── config/params.yaml
+│   ├── launch/pai_demo.launch.py       4ノードの一括起動
+│   ├── launch/demo_gazebo.launch.py    Gazebo + CRANE+ V2 を録画向けGUI設定(1280x720, 固定カメラ)で起動
+│   └── config/params.yaml, gui.config
 ├── scripts/           ワールド配置・ノード起動・指示送信の補助スクリプト（コンテナ内で実行）
 ├── docs/              レポート草稿・構成図
 ├── videos/            提出動画の素材・完成品（Gitには含めない）
@@ -30,13 +31,20 @@ pai-final-task/
    ```bash
    pip3 install -U anthropic brotli             # 初回のみ(古いbrotliだとSDKが接続エラーになる)
    cd ~/pai_work/pai-final-task/ros2_ws && colcon build --symlink-install
-   ros2 launch crane_plus_gazebo no_moveit_crane_plus_with_table.launch.py   # 別ターミナル(Ignition Gazebo)
+   ros2 launch pai_llm_arm demo_gazebo.launch.py   # 別ターミナル(Ignition Gazebo + CRANE+ V2)
+   # (講義パッケージ標準の起動: ros2 launch crane_plus_gazebo no_moveit_crane_plus_with_table.launch.py でも可)
    cd ~/pai_work/pai-final-task
    bash scripts/setup_world.sh      # 色付きブロックとトレイを配置
    bash scripts/start_nodes.sh      # perception / controller / monitor / planner を起動
    bash scripts/say.sh "赤いブロックを青いトレイに置いて"
    ros2 topic echo /monitor/result  # 成否
    bash scripts/reset_world.sh      # やり直し
+   ```
+5. デモの録画（コンテナ内, ffmpeg で Gazebo ウィンドウを x11grab）
+   ```bash
+   bash scripts/run_demo.sh basic   "赤いブロックを青いトレイに置いて"          # videos/basic.mp4
+   bash scripts/run_demo.sh recover "赤いブロックを緑のトレイに置いて" 20       # 20秒後に赤ブロックを動かし再計画を誘発
+   bash scripts/cam.sh 0.48 -0.40 1.42 0.08 0.04 1.10                           # GUIカメラを位置→注視点で指定
    ```
 
 ## トピック構成
@@ -47,7 +55,8 @@ pai-final-task/
 ```
 
 - 座標はロボット base_link 基準 [m]（x前方, y左, z上, テーブル面 z=0）。perception は Ignition の `/world/default/pose/info` 真値から変換
-- 動画撮影は noVNC の画面を母機側で録画するか、Gazebo の `/gui/record_video` サービスを使う
+- `/monitor/result` には最終結果(success/failure)のみ流れる。再計画の経過は `/monitor/status` と各ノードのログ(`/tmp/*.log`)
+- 録画中は CPU 競合でシミュレーション速度が実時間の5〜7割に落ちるため、controller は `use_sim_time` でステップを刻む
 
 ## 提出ルール（講義要項より）
 

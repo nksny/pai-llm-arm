@@ -5,6 +5,7 @@ planner:
     max_replans: 2
 controller:
   ros__parameters:
+    use_sim_time: true   # 録画等でRTFが落ちてもステップ間隔はシミュレーション時刻で刻む
     joint_cmd_topic: "/crane_plus_arm_controller/joint_trajectory"
     gripper_cmd_topic: "/crane_plus_gripper_controller/joint_trajectory"
     move_duration_sec: 2.0
@@ -14,6 +15,7 @@ monitor:
   ros__parameters:
     reach_tolerance_m: 0.03
     stall_timeout_sec: 8.0
+    max_replans: 2
 perception:
   ros__parameters:
     world: "default"

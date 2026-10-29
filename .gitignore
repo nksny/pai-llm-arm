@@ -1,8 +1,8 @@
-videos/
+*.pyc
+.env
+__pycache__/
 logs/
 ros2_ws/build/
 ros2_ws/install/
 ros2_ws/log/
-__pycache__/
-*.pyc
-.env
+videos/

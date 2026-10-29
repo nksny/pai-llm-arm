@@ -8,6 +8,7 @@ set_pose blue_block   0.15 -0.03 1.04
 set_pose yellow_block 0.09 -0.08 1.04
 set_pose blue_tray    0.10  0.14 1.02
 set_pose green_tray   0.17  0.10 1.02
+set_pose red_tray     0.16 -0.11 1.02
 ros2 topic pub --once /crane_plus_gripper_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory \
   "{joint_names: [crane_plus_joint_hand], points: [{positions: [-0.5], time_from_start: {sec: 1}}]}" >/dev/null
 ros2 topic pub --once /crane_plus_arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory \

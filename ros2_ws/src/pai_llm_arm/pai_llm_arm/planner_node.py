@@ -20,10 +20,12 @@ action:
 - grasp: グリッパを閉じる / release: 開く / home: 初期姿勢へ
 
 ルール:
-- 到達可能範囲: 原点からの水平距離 0.06〜0.21 m、z は 0.0〜0.15 m。範囲外なら error に理由を書き subgoals は空にする。
+- 到達可能範囲: 原点からの水平距離 0.06〜0.21 m、z は 0.0〜0.15 m。範囲外など実行不可能な場合だけ error に理由を書き subgoals は空にする。
+- 実行可能な場合 error は必ず空文字列 "" にする。解釈の根拠や補足は error ではなく note に書く。
 - ブロックは一辺4cm。把持はブロック中心の高さ(z≈0.02)で行う。
-- 手順: release → 対象の上方(z=0.09)へ move_to → 対象高さへ move_to → grasp → 上方へ退避 → 目的地上方へ move_to → 目的地の高さ(z=0.03)へ move_to → release → 上方へ退避 → home
+- 手順: release → 対象の上方(z=0.09)へ move_to → 対象高さへ move_to → grasp → 上方へ退避 → 目的地上方へ move_to → 目的地の高さ(z=0.045, ブロックを1cm強の高さから落として置く)へ move_to → release → 上方へ退避 → home
 - トレイに置く場合は、トレイ中心座標を目的地にする。複数物体なら1つずつ順に行う。
+- 同じトレイに複数のブロックを置く場合は重ねず、置き位置を中心から y 方向に ±0.025 m ずらして並べる。
 - 指示が曖昧な場合は物体一覧から最も妥当な解釈を選び、note に根拠を1行で書く。
 - 各 move_to の note には目的を短く書く(例: "赤いブロック上方")。"""
 
@@ -114,7 +116,12 @@ class Planner(Node):
                 data = json.loads(text)
                 self._validate(data)
                 self.history.append({"role": "assistant", "content": text})
-                out = {"error": data["error"]} if data["error"] else {"subgoals": data["subgoals"]}
+                if data["subgoals"]:  # subgoals があれば error 欄の文字列は補足とみなし無視する
+                    if data["error"]:
+                        self.get_logger().info(f"ignoring non-empty error with plan: {data['error']}")
+                    out = {"subgoals": data["subgoals"]}
+                else:
+                    out = {"error": data["error"] or "empty plan"}
                 self.pub.publish(String(data=json.dumps(out, ensure_ascii=False)))
                 self.get_logger().info(f"plan ({time.time()-t0:.1f}s, {len(data['subgoals'])} steps): {text}")
                 self._log(content, text, res.usage)
@@ -129,9 +136,9 @@ class Planner(Node):
 
     @staticmethod
     def _validate(data: dict):
-        if data.get("error"):
-            return
         if not data["subgoals"]:
+            if data.get("error"):
+                return
             raise ValueError("empty plan")
         for sg in data["subgoals"]:
             if sg["action"] == "move_to":

@@ -8,8 +8,12 @@ source ~/airobot_ws/install/setup.bash
 WORLD=default
 TABLE_Z=1.015
 
-ign service -s /world/$WORLD/remove --reqtype ignition.msgs.Entity --reptype ignition.msgs.Boolean \
-  --timeout 2000 --req 'name: "wood_cube_5cm" type: MODEL' >/dev/null 2>&1 || true
+# 既存の木ブロックと、再実行時の旧デモ物体を消す
+for m in wood_cube_5cm red_block blue_block yellow_block blue_tray green_tray red_tray; do
+  ign service -s /world/$WORLD/remove --reqtype ignition.msgs.Entity --reptype ignition.msgs.Boolean \
+    --timeout 2000 --req "name: \"$m\" type: MODEL" >/dev/null 2>&1 || true
+done
+sleep 1
 
 box_sdf() {  # name size_xyz rgb mass
   cat <<SDF
@@ -30,6 +34,7 @@ spawn() {  # name sdf x y z
 spawn red_block    "$(box_sdf red_block    "0.04 0.04 0.04" "1 0 0"   0.02)" 0.12  0.06 $(echo "$TABLE_Z+0.03" | bc)
 spawn blue_block   "$(box_sdf blue_block   "0.04 0.04 0.04" "0 0 1"   0.02)" 0.15 -0.03 $(echo "$TABLE_Z+0.03" | bc)
 spawn yellow_block "$(box_sdf yellow_block "0.04 0.04 0.04" "1 0.9 0" 0.02)" 0.09 -0.08 $(echo "$TABLE_Z+0.03" | bc)
-# トレイ: 薄い板 (静止させるため重め)
-spawn blue_tray    "$(box_sdf blue_tray    "0.08 0.08 0.005" "0.2 0.4 1" 0.5)" 0.10  0.14 $(echo "$TABLE_Z+0.01" | bc)
-spawn green_tray   "$(box_sdf green_tray   "0.08 0.08 0.005" "0.1 0.8 0.2" 0.5)" 0.17  0.10 $(echo "$TABLE_Z+0.01" | bc)
+# トレイ: 薄い板 (グリッパが触れても動かないよう重め。関節トルクでは押せない)
+spawn blue_tray    "$(box_sdf blue_tray    "0.08 0.08 0.005" "0.2 0.4 1" 3.0)" 0.10  0.14 $(echo "$TABLE_Z+0.01" | bc)
+spawn green_tray   "$(box_sdf green_tray   "0.08 0.08 0.005" "0.1 0.8 0.2" 3.0)" 0.17  0.10 $(echo "$TABLE_Z+0.01" | bc)
+spawn red_tray     "$(box_sdf red_tray     "0.08 0.08 0.005" "1 0.45 0.45" 3.0)" 0.16 -0.11 $(echo "$TABLE_Z+0.01" | bc)
