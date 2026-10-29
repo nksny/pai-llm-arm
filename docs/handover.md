@@ -67,6 +67,6 @@ Claude Code から操作する場合は `docker exec -u ubuntu -e DISPLAY=:0 pai
 ## 5. 次回やること（優先順）
 
 1. `videos/*_sub.mp4` の4本を確認し、必要なら撮り直し（`run_demo.sh` 1本 1〜2分。字幕も自動生成）。
-2. 動画編集（1〜3分, 構成説明 → 基本 → 曖昧 → 妨害復帰 → 工夫点と今後。倍速は明記）。
+2. 提出動画は `videos/final.mp4`（2分41秒, 1280x720, 無音）。`python3 scripts/make_final.py` で再生成（タイトル＋構成図 → ①基本 → ②曖昧 → ③仕分け → ④妨害復帰 → 工夫点と今後。実行区間は2倍速で右上に表記）。YouTube にタイトル `PAI最終課題_<omnicampusアカウント名>` で限定公開以上、子ども向け「いいえ」。
 3. レポートを推敲（`docs/report.md` → コンテナ内で `python3 scripts/build_pdf.py` → `docs/report.pdf`）。提出時に `説明資料_PAI最終課題_<omnicampusアカウント名>.pdf` にリネーム。
 4. GitHub public リポジトリ作成 → push → README 最終確認。

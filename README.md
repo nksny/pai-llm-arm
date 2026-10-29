@@ -48,6 +48,7 @@ pai-final-task/
    bash scripts/annotate.sh recover 2       # 字幕(指示文・計画中・妨害・再計画・結果)を焼き込み、2倍速版を作る
    ```
    `run_demo.sh` は録画と同時にイベント時刻を `videos/<name>.events` に記録し、終了時に字幕入り `videos/<name>_sub.mp4` も生成する。
+6. 提出動画の組み立て: `python3 scripts/make_final.py`（4本のデモからタイトル・章カード付きの `videos/final.mp4` を生成。レポート PDF は `python3 scripts/build_pdf.py`。どちらもコンテナ内で `pip3 install markdown weasyprint` が必要）
 
 ## トピック構成
 
