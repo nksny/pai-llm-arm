@@ -99,7 +99,10 @@ class Monitor(Node):
         self.pending_carry = None
         name = self.carried
         p = self.objects.get(name)
-        if not name or p is None:
+        if not name:
+            return
+        if p is None:  # 腕の真下などで俯瞰カメラから見えない。判定できないので保留(誤検知より見逃しを選ぶ)
+            self.get_logger().info(f"carry check skipped: {name} not visible near ({tx:.2f},{ty:.2f})")
             return
         d = ((p[0] - tx) ** 2 + (p[1] - ty) ** 2) ** 0.5
         if d <= float(self.get_parameter("carry_check_m").value):

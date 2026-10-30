@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # コンテナ内で実行: LLM を使わず固定計画(赤→青トレイ)を流し、ブロックの物性(摩擦・質量)による結果の違いを調べる。
-#   bash scripts/probe_physics.sh <mu> <mass> [tag]
+#   [TESTLIFT=1] bash scripts/probe_physics.sh <mu> <mass> [tag]   (TESTLIFT=1: 把持後に 1cm の試し持ち上げと 6cm の試し移動を挟む)
 # 出力(JSON 1行): 結果、置き位置の真値誤差、保持中の最大高さ、真値の時系列ファイル。
 # planner は止めておく(再計画で LLM を呼ばないため)。再計画要求が出た時点で失敗とみなす。
 source /opt/ros/humble/setup.bash
@@ -8,7 +8,8 @@ cd ~/pai_work/pai-final-task
 MU=$1; MASS=$2; TAG=${3:-probe}
 pkill -f "[l]ib/pai_llm_arm/planner" 2>/dev/null
 RED_MU=$MU RED_MASS=$MASS bash scripts/setup_world.sh >/dev/null; sleep 3
-PLAN='{"subgoals":[{"action":"release","note":"open"},{"action":"move_to","target":[0.10,0.05,0.09],"note":"above red"},{"action":"move_to","target":[0.10,0.05,0.02],"note":"red"},{"action":"grasp","note":"grasp"},{"action":"move_to","target":[0.10,0.05,0.09],"note":"lift"},{"action":"move_to","target":[0.10,0.14,0.09],"note":"above tray"},{"action":"move_to","target":[0.10,0.14,0.035],"note":"tray"},{"action":"release","note":"release"},{"action":"move_to","target":[0.10,0.14,0.09],"note":"up"},{"action":"home","note":"home"}]}'
+TEST=""; [ "${TESTLIFT:-0}" = 1 ] && TEST='{"action":"move_to","target":[0.10,0.05,0.03],"note":"試し持ち上げ"},{"action":"move_to","target":[0.10,0.11,0.03],"note":"試し移動"},'
+PLAN='{"subgoals":[{"action":"release","note":"open"},{"action":"move_to","target":[0.10,0.05,0.09],"note":"above red"},{"action":"move_to","target":[0.10,0.05,0.02],"note":"red"},{"action":"grasp","note":"grasp"},'"$TEST"'{"action":"move_to","target":[0.10,0.05,0.09],"note":"lift"},{"action":"move_to","target":[0.10,0.14,0.09],"note":"above tray"},{"action":"move_to","target":[0.10,0.14,0.035],"note":"tray"},{"action":"release","note":"release"},{"action":"move_to","target":[0.10,0.14,0.09],"note":"up"},{"action":"home","note":"home"}]}'
 mkdir -p logs/trace; TR=logs/trace/${TAG}_mu${MU}_m${MASS}_$(date +%H%M%S).txt
 bash scripts/trace_truth.sh red_block "$TR" & TRP=$!
 ros2 topic pub --once -w 1 /task/instruction std_msgs/String "{data: 'probe'}" >/dev/null 2>&1

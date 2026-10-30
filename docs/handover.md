@@ -35,6 +35,8 @@ GitHub: https://github.com/nksny/pai-llm-arm（public, ブランチ master）。
   controller は残りを捨てて release → home。同じ物体が 2 回続けて失われたら planner が理由付きで「計画不可」を返す。
 - **`/planner/reset`**: `reset_world.sh` / `setup_world.sh` が publish し、planner の会話履歴を消す。消さないと前エピソードの
   失敗記憶で無関係な次のタスクを拒否する（実測）。
+- **試し持ち上げは不採用**: 1 cm 上げて 6 cm 横に動かす試験は滑るブロック 7 回すべて通過し、本番の持ち上げで落ちた（低負荷では滑らない）。
+  `TESTLIFT=1 bash scripts/probe_physics.sh` で再現できる。腕の真下はカメラから見えないので monitor は判定をスキップする（ログに残す）。
 - planner の重複指示の窓を 5 秒 → 30 秒に（plan() が同期で 5 秒超かかると 2 通目を再計画していた）。
 - **グリッパ指令は ±0.66 rad 以内**に丸める。0.8 を送ったら関節が上限に張り付いて開かなくなり、コントローラ再起動でも直らず
   Gazebo の再起動が必要だった。
