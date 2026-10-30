@@ -14,3 +14,5 @@ ros2 topic pub --once /crane_plus_gripper_controller/joint_trajectory trajectory
 ros2 topic pub --once /crane_plus_arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory \
   "{joint_names: [crane_plus_joint1, crane_plus_joint2, crane_plus_joint3, crane_plus_joint4], points: [{positions: [0.0, 0.0, 0.0, 0.0], time_from_start: {sec: 2}}]}" >/dev/null
 echo "world reset"
+# planner の会話履歴を消す(新しいエピソード)。planner が居なければ 3 秒で諦める
+timeout 3 ros2 topic pub --once -w 1 /planner/reset std_msgs/String "{data: 'world reset'}" >/dev/null 2>&1 || true

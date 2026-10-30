@@ -26,6 +26,21 @@ GitHub: https://github.com/nksny/pai-llm-arm（public, ブランチ master）。
 - 初期配置: 赤ブロックを (0.10, 0.05) に（旧 (0.12, 0.06) は緑トレイの角に乗って 22° 傾いていた）。
 - 動画: `run_demo.sh` はカメラ知覚時にデバッグ画像も `videos/<name>_cam.mp4` に録り、`annotate.sh` が右下に PiP で重ねる。
 
+### 10/30 夜の追加（ブランチ friction-eval）
+- 提出版は master のタグ `v1.0-submission`。以後の変更はブランチ `friction-eval` で行い、確認後に master へ merge する。
+- **隠れた物性の実験**: `RED_MU=0.05 RED_MASS=0.2 bash scripts/setup_world.sh` で摩擦・質量を変えたブロックを spawn。
+  `scripts/probe_physics.sh <mu> <mass> [tag]` は LLM を使わず固定計画を流して `logs/probe.jsonl` に記録（真値の時系列は `logs/trace/`）。
+  結果: 摩擦 0.05×200 g と 0.02×100 g は持ち上げ 2 秒後に必ず滑落。握り強め・減速では救えない（レポート 5.5 節）。
+- **実行中の運搬監視**（monitor）: 把持した物体を記憶し、旋回完了時に目標付近に無ければ `/controller/abort` → 即再計画。
+  controller は残りを捨てて release → home。同じ物体が 2 回続けて失われたら planner が理由付きで「計画不可」を返す。
+- **`/planner/reset`**: `reset_world.sh` / `setup_world.sh` が publish し、planner の会話履歴を消す。消さないと前エピソードの
+  失敗記憶で無関係な次のタスクを拒否する（実測）。
+- planner の重複指示の窓を 5 秒 → 30 秒に（plan() が同期で 5 秒超かかると 2 通目を再計画していた）。
+- **グリッパ指令は ±0.66 rad 以内**に丸める。0.8 を送ったら関節が上限に張り付いて開かなくなり、コントローラ再起動でも直らず
+  Gazebo の再起動が必要だった。
+- `pkill -f "ign gazebo"` を `docker exec bash -c` の文字列内に書くと自分を殺す（`[i]gn` 形式でも、同じ文字列内に
+  `pgrep -af "ign gazebo"` があれば一致する）。Gazebo を止めるときは PID を見て kill する。
+
 ## 2. 再開手順（コンテナが残っている場合）
 
 ```bash

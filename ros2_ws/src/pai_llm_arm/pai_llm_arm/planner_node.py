@@ -64,11 +64,14 @@ class Planner(Node):
         self.objects = {}
         self.last_instruction = ""
         self.replans = 0
+        self.lost_streak, self.lost_key = 0, None
         self.history = []  # 会話履歴（「さっき置いた場所」などの参照指示に対応）
         self.pub = self.create_publisher(String, "/plan/subgoals", 10)
         self.create_subscription(String, "/perception/objects", self.on_objects, 10)
         self.create_subscription(String, "/task/instruction", self.on_instruction, 10)
         self.create_subscription(String, "/monitor/replan", self.on_replan, 10)
+        # 新しいエピソード(ワールドのリセット等)で会話履歴と失敗の記憶を消す。前のタスクの失敗を次の無関係なタスクに持ち越さないため
+        self.create_subscription(String, "/planner/reset", self.on_reset, 10)
         import anthropic  # APIキーは環境変数 ANTHROPIC_API_KEY のみ
         self.client = anthropic.Anthropic()
         self.get_logger().info(f"planner ready (model={self.get_parameter('model').value})")
@@ -76,14 +79,21 @@ class Planner(Node):
     def on_objects(self, msg: String):
         self.objects = json.loads(msg.data)
 
+    def on_reset(self, msg: String):
+        self.history = []
+        self.replans, self.lost_streak, self.lost_key = 0, 0, None
+        self._last_text = None
+        self.get_logger().info("episode reset: history cleared")
+
     def on_instruction(self, msg: String):
         # say.sh は配信取りこぼし対策で同じ指示を 2 回送るので、短時間の同一指示は 1 回だけ扱う
         now = time.time()
-        if msg.data == getattr(self, "_last_text", None) and now - getattr(self, "_last_t", 0.0) < 5.0:
+        if msg.data == getattr(self, "_last_text", None) and now - getattr(self, "_last_t", 0.0) < 30.0:  # plan() が同期で数秒かかるため、窓は計画時間より十分長くする
             return
         self._last_text, self._last_t = msg.data, now
         self.last_instruction = msg.data
         self.replans = 0
+        self.lost_streak, self.lost_key = 0, None
         self.get_logger().info(f"instruction: {msg.data}")
         self.plan(f"指示: {msg.data}")
 
@@ -93,9 +103,19 @@ class Planner(Node):
             return
         self.replans += 1
         self.get_logger().warn(f"replan #{self.replans}: {msg.data}")
+        extra = ""
+        # 同じ物体が運搬中に手元から離れる失敗が続く場合、同じ手順の繰り返しでは解決しない(滑りやすい・重いなど物性の問題)。
+        # 手順で回避できる見込みが無ければ、実行不可能として理由を返させる(無駄な再試行より「気づいて止まる」を優先)
+        key = msg.data.split("』")[0] if "手元から離れ" in msg.data else None
+        self.lost_streak = self.lost_streak + 1 if key and key == getattr(self, "lost_key", None) else (1 if key else 0)
+        self.lost_key = key
+        if self.lost_streak >= 2:
+            extra = ("\n注意: この物体は2回連続で運搬中に手元から離れました。把持や位置のずれではなく、滑りやすさや重さなど"
+                     "物性の問題で把持では運べない可能性が高いです。同じ手順を繰り返さず、手順で回避できる根拠が無ければ "
+                     "subgoals を空にし、error に「何が起きたか・なぜ実行不可能と判断したか・人に何をしてほしいか」を書いてください。")
         self.plan(
             f"指示: {self.last_instruction}\n前回の実行は失敗しました。理由: {msg.data}\n"
-            "現在の物体配置(最新)から計画し直してください。"
+            "現在の物体配置(最新)から計画し直してください。" + extra
         )
 
     def plan(self, user_text: str):

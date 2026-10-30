@@ -22,6 +22,9 @@ L_TOOL = 0.110       # joint4 → 把持点(指先の少し内側)
 ARM_JOINTS = ["crane_plus_joint1", "crane_plus_joint2", "crane_plus_joint3", "crane_plus_joint4"]
 GRIPPER_JOINT = ["crane_plus_joint_hand"]
 JOINT_LIMITS = [(-2.61, 2.61), (-1.82, 1.78), (-2.55, 2.45), (-1.84, 1.76)]
+# グリッパ関節の可動範囲(URDF: 109.38°〜188.27° − 150°)。上限を超える指令を送ると Gazebo 上で関節が上限に張り付いて
+# 開かなくなり、Gazebo の再起動が必要になる(実測)。必ずこの範囲に丸める
+GRIPPER_LIMITS = (-0.70, 0.66)
 
 
 def ik(x, y, z, tool_pitch_deg=None):
@@ -83,6 +86,7 @@ class Controller(Node):
         self.grip_pub = self.create_publisher(JointTrajectory, self.get_parameter("gripper_cmd_topic").value, 10)
         self.status_pub = self.create_publisher(String, "/controller/status", 10)
         self.create_subscription(String, "/plan/subgoals", self.on_plan, 10)
+        self.create_subscription(String, "/controller/abort", self.on_abort, 10)  # monitor が運搬失敗を検知したとき
         self.queue = []
         self.last_q = list(self.get_parameter("home_joints").value)
         self.holding = False
@@ -101,6 +105,14 @@ class Controller(Node):
         self.queue = list(data["subgoals"])
         self.done_pending = False
         self.get_logger().info(f"queued {len(self.queue)} subgoals")
+
+    def on_abort(self, msg: String):
+        """残りの計画を捨て、グリッパを開いて初期姿勢へ戻る(再計画は planner が行う)。"""
+        n = len(self.queue)
+        self.queue = [{"action": "release", "note": "中止: 開放"}, {"action": "home", "note": "中止: 初期姿勢"}]
+        self.done_pending = False
+        self.get_logger().warn(f"plan aborted ({msg.data}); dropped {n} subgoals")
+        self.status_pub.publish(String(data=json.dumps({"state": "aborted", "reason": msg.data}, ensure_ascii=False)))
 
     def _now(self):
         return self.get_clock().now().nanoseconds * 1e-9
@@ -149,18 +161,22 @@ class Controller(Node):
             self._send(self.arm_pub, ARM_JOINTS, q, sec)
             self.last_q = q
         elif act == "grasp":
-            self._send(self.grip_pub, GRIPPER_JOINT, [self.get_parameter("gripper_close").value], sec)
+            self._send(self.grip_pub, GRIPPER_JOINT, [self._grip(self.get_parameter("gripper_close").value)], sec)
             self.holding = True
         elif act == "release":
-            self._send(self.grip_pub, GRIPPER_JOINT, [self.get_parameter("gripper_open").value], sec)
+            self._send(self.grip_pub, GRIPPER_JOINT, [self._grip(self.get_parameter("gripper_open").value)], sec)
             self.holding = False
         self.done_pending = False   # 最後のサブゴールの動作完了を待ってから done を出す(カメラ知覚では腕が物体を隠すため)
         self.busy_until = self._now() + sec + float(self.get_parameter("settle_sec").value)
         self.last_sg = sg
         if self.queue:
             self.status_pub.publish(String(data=json.dumps({"state": "running", "last": sg}, ensure_ascii=False)))
-        else:
+        elif not str(sg.get("note", "")).startswith("中止"):
             self.done_pending = True   # 動作完了後に done を publish
+
+    @staticmethod
+    def _grip(v):
+        return min(GRIPPER_LIMITS[1], max(GRIPPER_LIMITS[0], float(v)))
 
     def _send(self, pub, names, positions, sec):
         msg = JointTrajectory()
